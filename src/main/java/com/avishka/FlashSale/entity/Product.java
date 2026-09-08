@@ -11,6 +11,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import jakarta.persistence.Version;
+
 @Entity
 @Table(name = "products")
 @Data
@@ -35,4 +37,7 @@ public class Product {
 
     @Column(length = 500)
     private String imageUrl;
+
+    @Version
+    private Long version;
 }
