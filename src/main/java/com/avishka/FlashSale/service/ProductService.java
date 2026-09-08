@@ -82,9 +82,6 @@ public class ProductService {
         List<Product> products = productRepository.findAll();
         for (Product product : products) {
             product.setStock(100);
-            if (product.getVersion() == null) {
-                product.setVersion(0L);
-            }
         }
         productRepository.saveAll(products);
     }

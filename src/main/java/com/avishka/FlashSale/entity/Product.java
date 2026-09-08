@@ -39,6 +39,5 @@ public class Product {
     private String imageUrl;
 
     @Version
-    @Builder.Default
-    private Long version = 0L;
+    private long version;
 }
