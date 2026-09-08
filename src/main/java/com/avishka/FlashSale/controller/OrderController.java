@@ -34,7 +34,11 @@ public class OrderController {
     @PostMapping("/buy")
     public ResponseEntity<Order> buyProduct(@RequestBody CreateOrderRequest createOrderRequest) {
         Order savedOrder = orderService.placeOrder(createOrderRequest);
-        return ResponseEntity.ok(savedOrder);
+        if ("SUCCEEDED".equalsIgnoreCase(savedOrder.getStatus())) {
+            return ResponseEntity.ok(savedOrder);
+        } else {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.CONFLICT).body(savedOrder);
+        }
     }
 
     @PostMapping("/clear")
