@@ -79,6 +79,7 @@ public class ProductService {
 
     @Transactional
     public void resetAllProductStock() {
+        productRepository.fixNullVersions();
         List<Product> products = productRepository.findAll();
         for (Product product : products) {
             product.setStock(100);
