@@ -23,6 +23,7 @@ public class OrderService {
         this.productRepository = productRepository;
     }
 
+    @Transactional(noRollbackFor = RuntimeException.class)
     public Order placeOrder(CreateOrderRequest createOrderRequest) {
         System.out.println(
                 "START placeOrder - customer: "
@@ -30,11 +31,12 @@ public class OrderService {
                         + " - thread: "
                         + Thread.currentThread().getName()
         );
-        Product product = productRepository.findById(createOrderRequest.getProductId())
+        // Acquire Pessimistic Write Lock (SELECT ... FOR UPDATE) on the product row
+        Product product = productRepository.findByIdWithPessimisticLock(createOrderRequest.getProductId())
                 .orElseThrow(() -> new RuntimeException("Product not found with id: " + createOrderRequest.getProductId()));
 
         String status;
-        // Naive purchase check (concurrency race condition scenario)
+        // Protected purchase check under pessimistic write lock
         if (product.getStock() >= createOrderRequest.getQuantity()) {
             product.setStock(product.getStock() - createOrderRequest.getQuantity());
             productRepository.save(product);
