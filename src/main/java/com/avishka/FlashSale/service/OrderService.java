@@ -116,6 +116,6 @@ public class OrderService {
 
     @Transactional
     public void clearAllOrders() {
-        orderRepository.deleteAll();
+        orderRepository.deleteAllInBatch();
     }
 }
