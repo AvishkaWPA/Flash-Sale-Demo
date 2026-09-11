@@ -48,7 +48,7 @@ public class ProductController {
     public String getAllProducts(Model model) {
         List<Product> products = productService.getAllProducts();
         List<Order> orders = orderService.getAllOrders();
-        Product testingProduct = products.isEmpty() ? null : products.get(0);
+        Product testingProduct = productService.getProduct(8); // Assuming productId 8 is the one being tested
 
         long succeededCount = orders.stream().filter(o -> "SUCCEEDED".equalsIgnoreCase(o.getStatus())).count();
         long failedCount = orders.stream().filter(o -> "FAILED_OUT_OF_STOCK".equalsIgnoreCase(o.getStatus())).count();
