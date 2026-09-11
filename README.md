@@ -118,6 +118,25 @@ http://localhost:8080/api/v1/product
 
 ---
 
+## ⚡ Multi-Instance & Load Testing Simulator
+
+To test race conditions and concurrency across multi-instance nodes (Port `8080` & Port `8081`):
+
+1. **Launch Instance 1 (Port 8080):**
+   ```powershell
+   $env:PORT="8080"; .\mvnw.cmd spring-boot:run
+   ```
+2. **Launch Instance 2 (Port 8081):**
+   ```powershell
+   $env:PORT="8081"; .\mvnw.cmd spring-boot:run
+   ```
+3. **Run 1,000 Concurrent User Load Simulator:**
+   ```powershell
+   .\run-simulator.ps1 -users 1000 -productId 8
+   ```
+
+---
+
 ## 📡 API Reference
 
 ### Product Endpoints
