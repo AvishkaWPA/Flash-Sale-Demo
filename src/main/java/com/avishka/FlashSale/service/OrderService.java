@@ -55,12 +55,20 @@ public class OrderService {
         RLock lock = redissonClient.getLock(lockKey);
 
         try {
-            // Acquire Redis Shared Lock (wait up to 10s, watchdog auto-renewal enabled via -1)
-            boolean isAcquired = lock.tryLock(10, -1, TimeUnit.SECONDS);
+            // Acquire Redis Shared Lock (wait up to 60s, watchdog auto-renewal enabled via -1)
+            boolean isAcquired = lock.tryLock(60, -1, TimeUnit.SECONDS);
 
             if (!isAcquired) {
                 System.out.println("Could not acquire Redis lock for product #" + targetProduct.getId());
-                return recordOrderInternal(targetProduct, createOrderRequest.getCustomerId(), createOrderRequest.getQuantity(), "FAILED_CONCURRENCY_CONFLICT");
+                return Order.builder()
+                        .productId(targetProduct.getId())
+                        .productName(targetProduct.getName())
+                        .customerId(createOrderRequest.getCustomerId())
+                        .quantity(createOrderRequest.getQuantity())
+                        .price(targetProduct.getPrice() * createOrderRequest.getQuantity())
+                        .status("FAILED_CONCURRENCY_CONFLICT")
+                        .orderedAt(LocalDateTime.now())
+                        .build();
             }
 
             try {
