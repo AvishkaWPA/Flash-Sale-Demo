@@ -3,9 +3,7 @@ package com.avishka.FlashSale.service;
 import java.time.LocalDateTime;
 import java.util.List;
 
-import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.avishka.FlashSale.dtos.req.CreateOrderRequest;
@@ -13,8 +11,6 @@ import com.avishka.FlashSale.entity.Order;
 import com.avishka.FlashSale.entity.Product;
 import com.avishka.FlashSale.repositories.OrderRepository;
 import com.avishka.FlashSale.repositories.ProductRepository;
-
-import jakarta.persistence.OptimisticLockException;
 
 @Service
 public class OrderService {
@@ -27,6 +23,7 @@ public class OrderService {
         this.productRepository = productRepository;
     }
 
+    @Transactional
     public Order placeOrder(CreateOrderRequest createOrderRequest) {
         System.out.println(
                 "START placeOrder - customer: "
@@ -35,38 +32,7 @@ public class OrderService {
                         + Thread.currentThread().getName()
         );
 
-        int maxRetries = 10;
-        int attempt = 0;
-        Order resultOrder = null;
-
-        while (attempt < maxRetries) {
-            attempt++;
-            try {
-                resultOrder = tryPlaceOrderOptimistic(createOrderRequest);
-                break; // Order successfully processed without version collision
-            } catch (ObjectOptimisticLockingFailureException | OptimisticLockException e) {
-                System.out.println("Optimistic Lock Conflict on attempt " + attempt + " for customer " + createOrderRequest.getCustomerId());
-                if (attempt >= maxRetries) {
-                    resultOrder = recordFailedOrder(createOrderRequest, "FAILED_OUT_OF_STOCK");
-                }
-            }
-        }
-
-        System.out.println(
-                "END placeOrder - customer: "
-                        + createOrderRequest.getCustomerId()
-        );
-
-        if (resultOrder != null) {
-            return resultOrder;
-        } else {
-            return recordFailedOrder(createOrderRequest, "FAILED_OUT_OF_STOCK");
-        }
-    }
-
-    @Transactional(propagation = Propagation.REQUIRES_NEW, noRollbackFor = RuntimeException.class)
-    public Order tryPlaceOrderOptimistic(CreateOrderRequest createOrderRequest) {
-        // Fallback to first available product if requested productId is not found
+        // Resolve requested product (or fallback to first available product in DB)
         Product product = productRepository.findById(createOrderRequest.getProductId())
                 .orElseGet(() -> productRepository.findAll().stream().findFirst().orElse(null));
 
@@ -74,11 +40,11 @@ public class OrderService {
             throw new RuntimeException("No products available in database.");
         }
 
+        // Execute Atomic SQL Update: UPDATE products SET stock = stock - qty WHERE id = ? AND stock >= qty
+        int rowsUpdated = productRepository.decreaseStockAtomic(product.getId(), createOrderRequest.getQuantity());
+
         String status;
-        // Optimistic check: JPA automatically verifies @Version during saveAndFlush
-        if (product.getStock() >= createOrderRequest.getQuantity()) {
-            product.setStock(product.getStock() - createOrderRequest.getQuantity());
-            productRepository.saveAndFlush(product); // Triggers optimistic version validation
+        if (rowsUpdated > 0) {
             status = "SUCCEEDED";
         } else {
             status = "FAILED_OUT_OF_STOCK";
@@ -95,26 +61,15 @@ public class OrderService {
                 .orderedAt(now)
                 .build();
 
-        return orderRepository.save(order);
-    }
+        Order savedOrder = orderRepository.save(order);
 
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public Order recordFailedOrder(CreateOrderRequest createOrderRequest, String status) {
-        Product product = productRepository.findById(createOrderRequest.getProductId())
-                .orElseGet(() -> productRepository.findAll().stream().findFirst().orElse(null));
+        System.out.println(
+                "END placeOrder - customer: "
+                        + createOrderRequest.getCustomerId()
+                        + " - status: " + status
+        );
 
-        LocalDateTime now = LocalDateTime.now();
-        Order order = Order.builder()
-                .productId(product != null ? product.getId() : createOrderRequest.getProductId())
-                .productName(product != null ? product.getName() : "Unknown Product")
-                .customerId(createOrderRequest.getCustomerId())
-                .quantity(createOrderRequest.getQuantity())
-                .price(product != null ? product.getPrice() * createOrderRequest.getQuantity() : 0.0)
-                .status(status)
-                .orderedAt(now)
-                .build();
-
-        return orderRepository.save(order);
+        return savedOrder;
     }
 
     public List<Order> getAllOrders() {
